@@ -1,77 +1,119 @@
 "use strict";
 
-const DbMixin = require("../mixins/db.mixin");
+const { MoleculerError } = require("moleculer").Errors;
 
 
 module.exports = {
-	name: "user",
-	mixins: [DbMixin("user")],
-
-
+	name: "users",
+	/**
+	 * mixins
+	 */
+	// mixins: [logMixin, redisMessage],
+	/**
+	 * Settings
+	 */
 	settings: {
-		fields: [
-			"_id",
-			"name",
-			"age",
-			"cpf"
-		],
-
-		// Validator for the `create` & `insert` actions.
-		entityValidator: {
-			name: "string|min:3",
-			age: "number|positive",
-			cpf: "number|positive"
-		}
+		logLevel: "debug"// level para os logs referentes a entrada e saída de cada ação deste serviço
 	},
 
-	hooks: {
-		before: {
-			create(ctx) {
-				// ctx.params.age = 0;
-				// ctx.params.cpf = 0;
-			}
-		}
-	},
+	/**
+	 * Dependencies
+	 */
+
+	dependencies: [],
+
+	/**
+	 * Actions
+	 */
 	actions: {
-		increaseAge: {
-			rest: "PUT /:id/age/increase",
+		message: {
 			params: {
-				id: "string",
-				value: "number|integer|positive"
+				userId: "string",
+				name: "string",
+				age: "number",
+				cpf: "number"
 			},
-			async handler(ctx) {
-				const doc = await this.adapter.updateById(ctx.params.id, { $inc: { age: ctx.params.value } });
-				const json = await this.transformDocuments(ctx, ctx.params, doc);
-				await this.entityChanged("updated", json, ctx);
+			async handler (ctx) {
+				try {
 
-				return json;
+					const { userId, name, age} = ctx.params;
+
+					const config = await ctx.call("user-repo.getByPortfolio", { name });
+
+					await this.addMessageToCache(userId, name, age, config.cpf);
+
+					if (!config.user) {
+						await this.broker.emit("user.finished", { userId, name });
+					}
+					// setTimeout(() => this.eventEmitter(clientId, portfolio));
+				} catch (err) {
+					this.logger.error({ errorMessage: err.message }, "service error");
+					// tratar erros do redis
+					throw new MoleculerError(err.message);
+				}
 			}
 		},
-		decreaseAge: {
-			rest: "PUT /:id/age/decrease",
-			params: {
-				id: "string",
-				value: "number|integer|positive"
-			},
-			async handler(ctx) {
-				const doc = await this.adapter.updateById(ctx.params.id, { $inc: { age: -ctx.params.value } });
-				const json = await this.transformDocuments(ctx, ctx.params, doc);
-				await this.entityChanged("updated", json, ctx);
 
-				return json;
+		// ACTION DE CRIAÇÃO DE MENSAGENS PARA AUXILIAR O DESENVOLVIMENTO
+		// REMOVER ESSA ACTION ANTES DE SUBIR A VERSÃO FINAL PARA O KUBERNETES
+		devMessageCreation: {
+			async handler (ctx) {
+				await this.broker.call("user.message", {
+					userId: "b1",
+					name: "carlos",
+					age: 22,
+					cpf: 123456789
+				});
+
+				await new Promise(resolve => setTimeout(resolve, 100));
+
+				await this.broker.call("user.message", {
+					userId: "b2",
+					name: "carlos",
+					age: 22,
+					cpf: 123456789
+				});
+
+				await new Promise(resolve => setTimeout(resolve, 100));
+
+				await this.broker.call("user.message", {
+					userId: "b3",
+					name: "carlos",
+					age: 22,
+					cpf: 123456789
+				});
+
+				await new Promise(resolve => setTimeout(resolve, 100));
+
+				await this.broker.call("user.message", {
+					userId: "b4",
+					name: "carlos",
+					age: 22,
+					cpf: 123456789
+				});
 			}
 		}
 	},
 
-	methods: {
-		async seedUsersDB() {
-			await this.adapter.insertMany([
-				{ name: "Reinaldo", age: 22, cpf: 20186166881 },
-				{ name: "Elcio", age: 25, cpf: 122354 },
-				{ name: "Paulo", age: 22, cpf: 125478963 },
-			]);
-		}
+	/**
+	 * Events
+	 */
+	events: {
 	},
+	/**
+	 * Methods
+	 */
 
-	// async afterConnected() {}
+	methods: {
+
+		/**
+		 * Emit Event to concat-sender.service
+		 *
+		 * @param {String} portfolio
+		 * @param {String} clientId
+		 */
+		async eventEmitter (userId, name) {
+			this.broker.emit('user.finished', { userId, name });
+		}
+	}
 };

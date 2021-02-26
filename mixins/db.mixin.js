@@ -3,9 +3,6 @@
 const fs = require("fs");
 const DbService	= require("moleculer-db");
 
-/**
- * @typedef {import('moleculer').Context} Context Moleculer's Context
- */
 
 module.exports = function(collection) {
 	const cacheCleanEventName = `cache.clean.${collection}`;
