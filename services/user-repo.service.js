@@ -109,7 +109,7 @@ module.exports = {
 				autoIncrement: true,
 				primaryKey: true
 			},
-			clientId: Sequelize.STRING,
+			Id: Sequelize.STRING,
 			name: Sequelize.STRING,
 			age: Sequelize.BOOLEAN,
 			cpf: Sequelize.INTEGER
